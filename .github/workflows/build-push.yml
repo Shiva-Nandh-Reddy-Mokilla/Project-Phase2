@@ -31,11 +31,11 @@ jobs:
       - name: Build and push Docker image
         run: |
           docker build \
-            -t shivaacr123.azurecr.io/eventhub-consumer:v1 \
+            -t shivaacr123.azurecr.io/eventhub-consumer:v2 \
             -t shivaacr123.azurecr.io/eventhub-consumer:latest \
             -f src/Consumer/Dockerfile \
             .
-          docker push shivaacr123.azurecr.io/eventhub-consumer:v1
+          docker push shivaacr123.azurecr.io/eventhub-consumer:v2
           docker push shivaacr123.azurecr.io/eventhub-consumer:latest
       
       - name: Build summary
