@@ -18,27 +18,29 @@ var configuration = new ConfigurationBuilder()
     .Build();
 
 // Event Hub configuration
-var eventHubConnectionString = configuration["EventHub:ConnectionString"]
-    ?? Environment.GetEnvironmentVariable("EVENTHUB_CONNECTION_STRING");
-var eventHubName = configuration["EventHub:EventHubName"]
-    ?? Environment.GetEnvironmentVariable("EVENTHUB_NAME");
+var eventHubConnectionString = Environment.GetEnvironmentVariable("EVENTHUB_CONNECTION_STRING")
+    ?? configuration["EventHub:ConnectionString"];
+var eventHubName = Environment.GetEnvironmentVariable("EVENTHUB_NAME")
+    ?? configuration["EventHub:EventHubName"];
 var consumerGroup = configuration["EventHub:ConsumerGroup"] ?? "$Default";
 
 // Storage configuration (for checkpoints and processed messages)
-var storageConnectionString = configuration["Storage:ConnectionString"]
-    ?? Environment.GetEnvironmentVariable("STORAGE_CONNECTION_STRING");
+var storageConnectionString = Environment.GetEnvironmentVariable("STORAGE_CONNECTION_STRING")
+    ?? configuration["Storage:ConnectionString"];
 var blobContainerName = configuration["Storage:ContainerName"] ?? "processed-messages";
 var checkpointContainerName = "checkpoints";
 
 // Service Bus configuration
-var serviceBusConnectionString = configuration["ServiceBus:ConnectionString"]
-    ?? Environment.GetEnvironmentVariable("SERVICEBUS_CONNECTION_STRING");
+var serviceBusConnectionString = Environment.GetEnvironmentVariable("SERVICEBUS_CONNECTION_STRING")
+    ?? configuration["ServiceBus:ConnectionString"];
 var serviceBusQueueName = configuration["ServiceBus:QueueName"] ?? "retry-queue";
 
 // Validate configuration
 if (string.IsNullOrEmpty(eventHubConnectionString) || string.IsNullOrEmpty(eventHubName))
 {
     Console.WriteLine("ERROR: Missing Event Hub configuration");
+    Console.WriteLine($"DEBUG: EVENTHUB_CONNECTION_STRING = {(string.IsNullOrEmpty(Environment.GetEnvironmentVariable("EVENTHUB_CONNECTION_STRING")) ? "NOT SET" : "SET")}");
+    Console.WriteLine($"DEBUG: EVENTHUB_NAME = {Environment.GetEnvironmentVariable("EVENTHUB_NAME") ?? "NOT SET"}");
     return;
 }
 if (string.IsNullOrEmpty(storageConnectionString))
