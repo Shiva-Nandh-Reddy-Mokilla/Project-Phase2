@@ -25,7 +25,7 @@
     <PackageReference Include="Azure.Messaging.EventHubs.Processor" Version="5.11.5" />
     
     <!-- Azure Storage Blobs - For storing processed messages and checkpoints -->
-    <PackageReference Include="Azure.Storage.Blobs" Version="12.19.1" />
+    <PackageReference Include="Azure.Storage.Blobs" Version="12.21.1" />
     
     <!-- Azure Service Bus - For retry/secondary processing queue -->
     <PackageReference Include="Azure.Messaging.ServiceBus" Version="7.17.5" />
