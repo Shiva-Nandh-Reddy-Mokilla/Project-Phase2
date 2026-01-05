@@ -1,0 +1,58 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+*.userprefs
+*.cache
+*.dll
+*.pdb
+*.exe
+!**/packages/build/
+
+# Application settings with secrets
+**/appsettings.Development.json
+**/appsettings.Local.json
+**/local.settings.json
+
+# Azure configuration (contains secrets)
+azure-config.sh
+
+# Secrets
+**/*secret*.yaml
+!**/*secret*.yaml.template
+.env
+.env.local
+
+# IDE
+.vscode/
+.vs/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Azure
+*.publishsettings
+*.azurePubxml
+
+# Docker
+.dockerignore
+
+# Kubernetes local configs
+kubeconfig
+*.kubeconfig
+

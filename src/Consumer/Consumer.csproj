@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- ====================================================================================
+       CONSUMER PROJECT - Phase 1 (Simplified Console App)
+       ====================================================================================
+       This is a simple console application that reads from Event Hubs.
+       No web server, no health checks, no Blob Storage, no checkpointing.
+       ==================================================================================== -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Azure Event Hubs - Core package for reading messages -->
+    <PackageReference Include="Azure.Messaging.EventHubs" Version="5.11.5" />
+    
+    <!-- Configuration support for reading appsettings.json and environment variables -->
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="8.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="appsettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+</Project>
