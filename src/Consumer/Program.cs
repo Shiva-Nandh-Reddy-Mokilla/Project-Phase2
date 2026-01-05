@@ -1,129 +1,239 @@
+using Azure.Messaging.EventHubs;
 using Azure.Messaging.EventHubs.Consumer;
+using Azure.Messaging.EventHubs.Processor;
+using Azure.Messaging.ServiceBus;
+using Azure.Storage.Blobs;
 using Microsoft.Extensions.Configuration;
 using System.Text;
+using System.Text.Json;
 
-Console.WriteLine("Event Hubs Consumer Starting...");
+Console.WriteLine("Event Hubs Consumer Starting (Phase 2)...");
 Console.WriteLine();
 
-// Load configuration from appsettings.json and environment variables
+// Load configuration
 var configuration = new ConfigurationBuilder()
     .SetBasePath(Directory.GetCurrentDirectory())
     .AddJsonFile("appsettings.json", optional: true)
     .AddEnvironmentVariables()
     .Build();
 
-// Get Event Hub connection details
-var connectionString = configuration["EventHub:ConnectionString"]
+// Event Hub configuration
+var eventHubConnectionString = configuration["EventHub:ConnectionString"]
     ?? Environment.GetEnvironmentVariable("EVENTHUB_CONNECTION_STRING");
-
 var eventHubName = configuration["EventHub:EventHubName"]
     ?? Environment.GetEnvironmentVariable("EVENTHUB_NAME");
-
 var consumerGroup = configuration["EventHub:ConsumerGroup"] ?? "$Default";
 
-if (string.IsNullOrEmpty(connectionString) || string.IsNullOrEmpty(eventHubName))
+// Storage configuration (for checkpoints and processed messages)
+var storageConnectionString = configuration["Storage:ConnectionString"]
+    ?? Environment.GetEnvironmentVariable("STORAGE_CONNECTION_STRING");
+var blobContainerName = configuration["Storage:ContainerName"] ?? "processed-messages";
+var checkpointContainerName = "checkpoints";
+
+// Service Bus configuration
+var serviceBusConnectionString = configuration["ServiceBus:ConnectionString"]
+    ?? Environment.GetEnvironmentVariable("SERVICEBUS_CONNECTION_STRING");
+var serviceBusQueueName = configuration["ServiceBus:QueueName"] ?? "retry-queue";
+
+// Validate configuration
+if (string.IsNullOrEmpty(eventHubConnectionString) || string.IsNullOrEmpty(eventHubName))
 {
-    Console.WriteLine("ERROR: Missing configuration. Set EVENTHUB_CONNECTION_STRING and EVENTHUB_NAME");
+    Console.WriteLine("ERROR: Missing Event Hub configuration");
+    return;
+}
+if (string.IsNullOrEmpty(storageConnectionString))
+{
+    Console.WriteLine("ERROR: Missing Storage configuration");
+    return;
+}
+if (string.IsNullOrEmpty(serviceBusConnectionString))
+{
+    Console.WriteLine("ERROR: Missing Service Bus configuration");
     return;
 }
 
 Console.WriteLine($"Event Hub: {eventHubName}");
-Console.WriteLine($"Consumer Group: {consumerGroup}");
+Console.WriteLine($"Storage Container: {blobContainerName}");
+Console.WriteLine($"Service Bus Queue: {serviceBusQueueName}");
 Console.WriteLine();
 
-// Create consumer client to read messages from Event Hubs
-await using var consumer = new EventHubConsumerClient(
+// Create clients
+var blobContainerClient = new BlobContainerClient(storageConnectionString, blobContainerName);
+await blobContainerClient.CreateIfNotExistsAsync();
+
+var checkpointBlobClient = new BlobContainerClient(storageConnectionString, checkpointContainerName);
+await checkpointBlobClient.CreateIfNotExistsAsync();
+
+var serviceBusClient = new ServiceBusClient(serviceBusConnectionString);
+var serviceBusSender = serviceBusClient.CreateSender(serviceBusQueueName);
+var serviceBusProcessor = serviceBusClient.CreateProcessor(serviceBusQueueName, new ServiceBusProcessorOptions());
+
+// Create Event Processor Client (with checkpointing)
+var processor = new EventProcessorClient(
+    checkpointBlobClient,
     consumerGroup,
-    connectionString,
+    eventHubConnectionString,
     eventHubName);
 
-Console.WriteLine("Connected to Event Hub");
-Console.WriteLine("Listening for messages... (Press Ctrl+C to stop)");
-Console.WriteLine();
-
-try
+// Setup cancellation for graceful shutdown
+var cancellationSource = new CancellationTokenSource();
+Console.CancelKeyPress += (sender, args) =>
 {
-    // Get all partitions in the Event Hub
-    string[] partitionIds = await consumer.GetPartitionIdsAsync();
-    Console.WriteLine($"Event Hub has {partitionIds.Length} partition(s)");
+    args.Cancel = true;
+    cancellationSource.Cancel();
     Console.WriteLine();
+    Console.WriteLine("Shutting down...");
+};
 
-    // Setup Ctrl+C handler for graceful shutdown
-    var cancellationSource = new CancellationTokenSource();
-    Console.CancelKeyPress += (sender, args) =>
-    {
-        args.Cancel = true;
-        cancellationSource.Cancel();
-        Console.WriteLine();
-        Console.WriteLine("Shutting down...");
-    };
-
-    // Read from all partitions at the same time
-    var readTasks = partitionIds.Select(partitionId =>
-        ReadPartitionAsync(consumer, partitionId, cancellationSource.Token));
-
-    await Task.WhenAll(readTasks);
-}
-catch (Exception ex)
-{
-    Console.WriteLine($"ERROR: {ex.Message}");
-}
-
-Console.WriteLine("Consumer stopped");
-
-// Reads messages from a single partition
-static async Task ReadPartitionAsync(
-    EventHubConsumerClient consumer,
-    string partitionId,
-    CancellationToken cancellationToken)
+// Event Hub message handler
+processor.ProcessEventAsync += async (args) =>
 {
     try
     {
-        // Read events from this partition (starts from latest messages)
-        await foreach (var partitionEvent in consumer.ReadEventsFromPartitionAsync(
-            partitionId,
-            Azure.Messaging.EventHubs.Consumer.EventPosition.Latest,
-            cancellationToken))
+        if (args.Data == null)
+            return;
+
+        var messageBody = Encoding.UTF8.GetString(args.Data.EventBody.ToArray());
+        var partition = args.Partition.PartitionId;
+
+        // Parse message
+        string messageId = "N/A";
+        string timestamp = "N/A";
+        bool shouldRetry = false;
+
+        try
         {
-            if (partitionEvent.Data == null)
-                continue;
-
-            // Get message body
-            var messageBody = Encoding.UTF8.GetString(partitionEvent.Data.EventBody.ToArray());
-
-            // Try to parse message properties if it's JSON
-            string messageId = "N/A";
-            string timestamp = "N/A";
-
-            try
-            {
-                var json = System.Text.Json.JsonDocument.Parse(messageBody);
-                if (json.RootElement.TryGetProperty("MessageId", out var idProp))
-                    messageId = idProp.GetString() ?? "N/A";
-                if (json.RootElement.TryGetProperty("Timestamp", out var tsProp))
-                    timestamp = tsProp.GetString() ?? "N/A";
-            }
-            catch
-            {
-            }
-
-            // Log the received message
-            Console.WriteLine("========================================");
-            Console.WriteLine("RECEIVED MESSAGE");
-            Console.WriteLine($"  Partition:   {partitionId}");
-            Console.WriteLine($"  Message ID:  {messageId}");
-            Console.WriteLine($"  Timestamp:   {timestamp}");
-            Console.WriteLine($"  Body:        {messageBody}");
-            Console.WriteLine("========================================");
-            Console.WriteLine();
+            var json = JsonDocument.Parse(messageBody);
+            if (json.RootElement.TryGetProperty("MessageId", out var idProp))
+                messageId = idProp.GetString() ?? "N/A";
+            if (json.RootElement.TryGetProperty("Timestamp", out var tsProp))
+                timestamp = tsProp.GetString() ?? "N/A";
+            if (json.RootElement.TryGetProperty("ShouldRetry", out var retryProp))
+                shouldRetry = retryProp.GetBoolean();
         }
-    }
-    catch (TaskCanceledException)
-    {
-        // Expected when Ctrl+C is pressed
+        catch { }
+
+        Console.WriteLine("========================================");
+        Console.WriteLine("EVENT HUB MESSAGE RECEIVED");
+        Console.WriteLine($"  Partition:   {partition}");
+        Console.WriteLine($"  Message ID:  {messageId}");
+        Console.WriteLine($"  Timestamp:   {timestamp}");
+        Console.WriteLine($"  Body:        {messageBody}");
+        Console.WriteLine("========================================");
+
+        // Store to Blob Storage
+        var blobName = $"eventhub/{DateTime.UtcNow:yyyy-MM-dd}/{messageId}_{Guid.NewGuid()}.json";
+        var blobClient = blobContainerClient.GetBlobClient(blobName);
+        await blobClient.UploadAsync(new BinaryData(messageBody), overwrite: true);
+        Console.WriteLine($"✓ Stored to Blob: {blobName}");
+
+        // Decide if message should go to Service Bus
+        // Rule: Forward if ShouldRetry=true OR messageId is divisible by 5
+        bool forwardToServiceBus = shouldRetry;
+        if (!string.IsNullOrEmpty(messageId) && int.TryParse(messageId, out int idNum))
+        {
+            if (idNum % 5 == 0)
+                forwardToServiceBus = true;
+        }
+
+        if (forwardToServiceBus)
+        {
+            var sbMessage = new ServiceBusMessage(messageBody);
+            await serviceBusSender.SendMessageAsync(sbMessage);
+            Console.WriteLine($"✓ Forwarded to Service Bus");
+        }
+
+        Console.WriteLine();
+
+        // Checkpoint (mark message as processed)
+        await args.UpdateCheckpointAsync();
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"ERROR reading from partition {partitionId}: {ex.Message}");
+        Console.WriteLine($"ERROR processing Event Hub message: {ex.Message}");
     }
+};
+
+// Event Hub error handler
+processor.ProcessErrorAsync += (args) =>
+{
+    Console.WriteLine($"ERROR: {args.Exception.Message}");
+    return Task.CompletedTask;
+};
+
+// Service Bus message handler
+serviceBusProcessor.ProcessMessageAsync += async (args) =>
+{
+    try
+    {
+        var messageBody = args.Message.Body.ToString();
+
+        // Parse message
+        string messageId = "N/A";
+        try
+        {
+            var json = JsonDocument.Parse(messageBody);
+            if (json.RootElement.TryGetProperty("MessageId", out var idProp))
+                messageId = idProp.GetString() ?? "N/A";
+        }
+        catch { }
+
+        Console.WriteLine("========================================");
+        Console.WriteLine("SERVICE BUS MESSAGE RECEIVED");
+        Console.WriteLine($"  Message ID:  {messageId}");
+        Console.WriteLine($"  Body:        {messageBody}");
+        Console.WriteLine("========================================");
+
+        // Store to Blob Storage with different prefix
+        var blobName = $"servicebus/{DateTime.UtcNow:yyyy-MM-dd}/{messageId}_{Guid.NewGuid()}.json";
+        var blobClient = blobContainerClient.GetBlobClient(blobName);
+        await blobClient.UploadAsync(new BinaryData(messageBody), overwrite: true);
+        Console.WriteLine($"✓ Stored to Blob: {blobName}");
+        Console.WriteLine();
+
+        // Complete the message
+        await args.CompleteMessageAsync(args.Message);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"ERROR processing Service Bus message: {ex.Message}");
+    }
+};
+
+// Service Bus error handler
+serviceBusProcessor.ProcessErrorAsync += (args) =>
+{
+    Console.WriteLine($"ERROR: {args.Exception.Message}");
+    return Task.CompletedTask;
+};
+
+// Start processing
+Console.WriteLine("Starting Event Hub processor...");
+await processor.StartProcessingAsync(cancellationSource.Token);
+Console.WriteLine("Event Hub processor started");
+
+Console.WriteLine("Starting Service Bus processor...");
+await serviceBusProcessor.StartProcessingAsync(cancellationSource.Token);
+Console.WriteLine("Service Bus processor started");
+
+Console.WriteLine();
+Console.WriteLine("Listening for messages... (Press Ctrl+C to stop)");
+Console.WriteLine();
+
+// Wait until cancelled
+try
+{
+    await Task.Delay(Timeout.Infinite, cancellationSource.Token);
 }
+catch (TaskCanceledException)
+{
+    // Expected when Ctrl+C is pressed
+}
+
+// Cleanup
+Console.WriteLine("Stopping processors...");
+await processor.StopProcessingAsync();
+await serviceBusProcessor.StopProcessingAsync();
+await serviceBusSender.DisposeAsync();
+await serviceBusClient.DisposeAsync();
+Console.WriteLine("Consumer stopped");

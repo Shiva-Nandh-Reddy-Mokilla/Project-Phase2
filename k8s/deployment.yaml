@@ -18,7 +18,7 @@ spec:
     spec:
       containers:
       - name: consumer
-        image: shivaacr123.azurecr.io/eventhub-consumer:v1
+        image: shivaacr123.azurecr.io/eventhub-consumer:v2
         imagePullPolicy: Always
         
         # Environment variables injected from ConfigMap and Secret
@@ -34,6 +34,18 @@ spec:
             secretKeyRef:
               name: azure-secrets
               key: eventhub-connection
+        
+        - name: STORAGE_CONNECTION_STRING
+          valueFrom:
+            secretKeyRef:
+              name: azure-secrets
+              key: storage-connection
+        
+        - name: SERVICEBUS_CONNECTION_STRING
+          valueFrom:
+            secretKeyRef:
+              name: azure-secrets
+              key: servicebus-connection
         
         # Resource limits for the container
         resources:

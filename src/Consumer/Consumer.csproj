@@ -1,10 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!-- ====================================================================================
-       CONSUMER PROJECT - Phase 1 (Simplified Console App)
+       CONSUMER PROJECT - Phase 2
        ====================================================================================
-       This is a simple console application that reads from Event Hubs.
-       No web server, no health checks, no Blob Storage, no checkpointing.
+       Console app that:
+       - Reads from Event Hubs with checkpointing
+       - Stores messages to Azure Blob Storage
+       - Forwards selected messages to Service Bus
+       - Processes Service Bus messages
        ==================================================================================== -->
 
   <PropertyGroup>
@@ -17,6 +20,15 @@
   <ItemGroup>
     <!-- Azure Event Hubs - Core package for reading messages -->
     <PackageReference Include="Azure.Messaging.EventHubs" Version="5.11.5" />
+    
+    <!-- Azure Event Hubs Processor - For checkpointing and reliable processing -->
+    <PackageReference Include="Azure.Messaging.EventHubs.Processor" Version="5.11.5" />
+    
+    <!-- Azure Storage Blobs - For storing processed messages and checkpoints -->
+    <PackageReference Include="Azure.Storage.Blobs" Version="12.19.1" />
+    
+    <!-- Azure Service Bus - For retry/secondary processing queue -->
+    <PackageReference Include="Azure.Messaging.ServiceBus" Version="7.17.5" />
     
     <!-- Configuration support for reading appsettings.json and environment variables -->
     <PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.0" />
