@@ -18,7 +18,7 @@ spec:
     spec:
       containers:
       - name: producer
-        image: shivaacr123.azurecr.io/eventhub-producer:v1
+        image: shivaacr123.azurecr.io/eventhub-producer:latest
         imagePullPolicy: Always
         
         # Environment variables

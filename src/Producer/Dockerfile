@@ -1,4 +1,5 @@
 # Dockerfile for Producer app
+# Force rebuild: 2026-01-12
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 
