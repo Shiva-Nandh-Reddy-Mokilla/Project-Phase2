@@ -21,11 +21,12 @@ class Program
             .Build();
 
         // Get Event Hub connection details
-        var connectionString = configuration["EventHub:ConnectionString"] 
-            ?? Environment.GetEnvironmentVariable("EVENTHUB_CONNECTION_STRING");
+        // Always prefer environment variables (for Kubernetes)
+        var connectionString = Environment.GetEnvironmentVariable("EVENTHUB_CONNECTION_STRING")
+            ?? configuration["EventHub:ConnectionString"];
         
-        var eventHubName = configuration["EventHub:EventHubName"] 
-            ?? Environment.GetEnvironmentVariable("EVENTHUB_NAME");
+        var eventHubName = Environment.GetEnvironmentVariable("EVENTHUB_NAME")
+            ?? configuration["EventHub:EventHubName"];
 
         if (string.IsNullOrEmpty(connectionString) || string.IsNullOrEmpty(eventHubName))
         {
