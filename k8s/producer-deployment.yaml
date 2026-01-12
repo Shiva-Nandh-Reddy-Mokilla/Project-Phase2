@@ -1,0 +1,73 @@
+# Deployment for Producer app in AKS
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eventhub-producer
+  namespace: default
+  labels:
+    app: eventhub-producer
+spec:
+  replicas: 1  # Usually only need 1 producer for testing
+  selector:
+    matchLabels:
+      app: eventhub-producer
+  template:
+    metadata:
+      labels:
+        app: eventhub-producer
+    spec:
+      containers:
+      - name: producer
+        image: shivaacr123.azurecr.io/eventhub-producer:v1
+        imagePullPolicy: Always
+        
+        # Environment variables
+        env:
+        - name: EVENTHUB_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: producer-config
+              key: EVENTHUB_NAME
+        
+        - name: EVENTHUB_CONNECTION_STRING
+          valueFrom:
+            secretKeyRef:
+              name: azure-secrets  # Reuse existing secret
+              key: eventhub-connection
+        
+        - name: MESSAGE_INTERVAL_SECONDS
+          valueFrom:
+            configMapKeyRef:
+              name: producer-config
+              key: MESSAGE_INTERVAL_SECONDS
+        
+        # Resource limits
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+        
+        # Health checks
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - "ps aux | grep -v grep | grep dotnet || exit 1"
+          initialDelaySeconds: 15
+          periodSeconds: 10
+          failureThreshold: 3
+        
+        readinessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - "ps aux | grep -v grep | grep dotnet || exit 1"
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          failureThreshold: 2
+

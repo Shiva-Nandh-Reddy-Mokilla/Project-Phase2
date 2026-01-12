@@ -175,3 +175,5 @@ env:
 **Phase 1 (completed):** Event Hubs → Consumer → Logs ✅
 **Phase 2 (to build):** Event Hubs → Consumer → Storage + Service Bus → Logs
 
+
+

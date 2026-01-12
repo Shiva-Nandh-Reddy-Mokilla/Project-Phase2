@@ -7,7 +7,7 @@ metadata:
   labels:
     app: eventhub-consumer
 spec:
-  replicas: 1  # Number of pods to run
+  replicas: 2  # Number of pods to run (increased for high availability)
   selector:
     matchLabels:
       app: eventhub-consumer
@@ -55,3 +55,28 @@ spec:
           limits:
             cpu: 500m
             memory: 512Mi
+        
+        # Health checks (Stretch Phase: Liveness & Readiness Probes)
+        # Liveness probe: Restart pod if it becomes unresponsive
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - "ps aux | grep -v grep | grep dotnet || exit 1"
+          initialDelaySeconds: 30  # Wait 30s after start before checking
+          periodSeconds: 10        # Check every 10 seconds
+          timeoutSeconds: 5        # Timeout after 5 seconds
+          failureThreshold: 3      # Restart after 3 consecutive failures
+        
+        # Readiness probe: Remove from load balancer if not ready
+        readinessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - "ps aux | grep -v grep | grep dotnet || exit 1"
+          initialDelaySeconds: 10  # Check after 10s
+          periodSeconds: 5         # Check every 5 seconds
+          timeoutSeconds: 3
+          failureThreshold: 2      # Mark not ready after 2 failures

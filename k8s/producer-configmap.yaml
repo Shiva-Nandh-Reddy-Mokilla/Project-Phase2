@@ -1,0 +1,10 @@
+# ConfigMap for Producer - non-sensitive configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: producer-config
+  namespace: default
+data:
+  EVENTHUB_NAME: "my-event-hub"
+  MESSAGE_INTERVAL_SECONDS: "2"  # How often to send messages
+

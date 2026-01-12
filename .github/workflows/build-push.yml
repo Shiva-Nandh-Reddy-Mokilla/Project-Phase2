@@ -11,6 +11,7 @@ on:
       - master
     paths:
       - 'src/Consumer/**'
+      - 'src/Producer/**'
       - '.github/workflows/build-push.yml'
 
 jobs:
@@ -28,7 +29,7 @@ jobs:
           username: ${{ secrets.ACR_USERNAME }}
           password: ${{ secrets.ACR_PASSWORD }}
       
-      - name: Build and push Docker image
+      - name: Build and push Consumer image
         run: |
           docker build \
             -t shivaacr123.azurecr.io/eventhub-consumer:v2 \
@@ -38,5 +39,15 @@ jobs:
           docker push shivaacr123.azurecr.io/eventhub-consumer:v2
           docker push shivaacr123.azurecr.io/eventhub-consumer:latest
       
+      - name: Build and push Producer image
+        run: |
+          docker build \
+            -t shivaacr123.azurecr.io/eventhub-producer:v1 \
+            -t shivaacr123.azurecr.io/eventhub-producer:latest \
+            -f src/Producer/Dockerfile \
+            .
+          docker push shivaacr123.azurecr.io/eventhub-producer:v1
+          docker push shivaacr123.azurecr.io/eventhub-producer:latest
+      
       - name: Build summary
-        run: echo "Build complete"
+        run: echo "Build complete - Consumer and Producer images pushed"
