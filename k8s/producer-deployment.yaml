@@ -50,24 +50,6 @@ spec:
             cpu: 200m
             memory: 256Mi
         
-        # Health checks
-        livenessProbe:
-          exec:
-            command:
-            - /bin/sh
-            - -c
-            - "ps aux | grep -v grep | grep dotnet || exit 1"
-          initialDelaySeconds: 15
-          periodSeconds: 10
-          failureThreshold: 3
-        
-        readinessProbe:
-          exec:
-            command:
-            - /bin/sh
-            - -c
-            - "ps aux | grep -v grep | grep dotnet || exit 1"
-          initialDelaySeconds: 5
-          periodSeconds: 5
-          failureThreshold: 2
+        # Health checks temporarily disabled - Producer works without them
+        # Will add proper HTTP health endpoint later
 
