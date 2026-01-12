@@ -274,6 +274,8 @@ Via Azure Portal, delete the resource group `EventHub-test` to remove all resour
 - Azure Event Hubs
 - Azure Kubernetes Service (AKS)
 - Azure Storage (Blob)
+- <img width="1126" height="591" alt="image" src="https://github.com/user-attachments/assets/ed0d8c1e-f4d0-4f45-b3b6-9f3f7c130e32" />
+
 - Azure Service Bus
 - Azure Container Registry
 - Docker
